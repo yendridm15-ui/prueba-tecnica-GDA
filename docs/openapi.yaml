@@ -1,0 +1,263 @@
+openapi: 3.0.3
+
+info:
+  title: API de Customers - Prueba Técnica GDALab
+  description: |
+    API RESTful para registrar, consultar y eliminar lógicamente customers.
+
+    Todos los endpoints (menos el login) requieren un token que se obtiene en `/api/login`
+    y se envía en el header `Authorization: Bearer <token>`. El token tiene vencimiento
+    (60 minutos por defecto) y una vez vencido deja de dar acceso.
+
+    Todas las respuestas usan el mismo formato:
+    `{ "success": true|false, "message": "...", "data": ... }`
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: Ambiente local / Docker
+
+tags:
+  - name: Autenticación
+  - name: Customers
+
+paths:
+  /api/login:
+    post:
+      tags: [Autenticación]
+      summary: Iniciar sesión y obtener el token
+      description: Valida las credenciales y devuelve un token único con su fecha de vencimiento. Límite de 10 intentos por minuto por IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: test@example.com
+                password:
+                  type: string
+                  example: password
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              example:
+                success: true
+                message: Inicio de sesión exitoso
+                data:
+                  token: 6b89acd6a2cec30944f5b18618840f8b7bc3157f
+                  expires_at: '2026-07-18 05:00:00'
+        '401':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              example:
+                success: false
+                message: Credenciales inválidas
+                data: null
+        '422':
+          description: Datos incompletos o con formato inválido
+          content:
+            application/json:
+              example:
+                success: false
+                message: Datos de inicio de sesión inválidos
+                data:
+                  email: ['El campo email es obligatorio.']
+
+  /api/customers:
+    post:
+      tags: [Customers]
+      summary: Registrar un customer
+      description: Crea un customer activo. La comuna debe existir, estar activa y pertenecer a la región indicada.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dni, id_reg, id_com, email, name, last_name]
+              properties:
+                dni:
+                  type: string
+                  maxLength: 45
+                  example: 11111111-1
+                id_reg:
+                  type: integer
+                  description: ID de la región (debe estar activa)
+                  example: 1
+                id_com:
+                  type: integer
+                  description: ID de la comuna (debe estar activa y pertenecer a la región)
+                  example: 1
+                email:
+                  type: string
+                  format: email
+                  maxLength: 120
+                  example: juan@example.com
+                name:
+                  type: string
+                  maxLength: 45
+                  example: Juan
+                last_name:
+                  type: string
+                  maxLength: 45
+                  example: Perez
+                address:
+                  type: string
+                  maxLength: 255
+                  nullable: true
+                  example: Calle Falsa 123
+      responses:
+        '201':
+          description: Customer registrado
+          content:
+            application/json:
+              example:
+                success: true
+                message: Customer registrado con éxito
+                data:
+                  dni: 11111111-1
+                  email: juan@example.com
+                  name: Juan
+                  last_name: Perez
+                  address: Calle Falsa 123
+                  date_reg: '2026-07-18 03:51:52'
+                  status: A
+                  region: Distrito Capital
+                  commune: Caracas
+        '401':
+          $ref: '#/components/responses/NoAutorizado'
+        '422':
+          description: Error de validación (campos, duplicados o comuna que no pertenece a la región)
+          content:
+            application/json:
+              example:
+                success: false
+                message: Datos de registro inválidos
+                data:
+                  id_com: ['La comuna indicada no existe, no está activa o no pertenece a la región.']
+
+    get:
+      tags: [Customers]
+      summary: Consultar un customer por dni o email
+      description: Solo devuelve customers activos (status A). Debe enviarse al menos uno de los dos parámetros.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: dni
+          in: query
+          required: false
+          schema:
+            type: string
+          example: 11111111-1
+        - name: email
+          in: query
+          required: false
+          schema:
+            type: string
+          example: juan@example.com
+      responses:
+        '200':
+          description: Customer encontrado
+          content:
+            application/json:
+              example:
+                success: true
+                message: Customer encontrado
+                data:
+                  name: Juan
+                  last_name: Perez
+                  address: Calle Falsa 123
+                  region: Distrito Capital
+                  commune: Caracas
+        '404':
+          description: No existe un customer activo con esos datos
+          content:
+            application/json:
+              example:
+                success: false
+                message: Customer no encontrado
+                data: null
+        '401':
+          $ref: '#/components/responses/NoAutorizado'
+        '422':
+          $ref: '#/components/responses/FaltaIdentificador'
+
+    delete:
+      tags: [Customers]
+      summary: Eliminar lógicamente un customer
+      description: El customer pasa a status T (trash). Solo aplica para customers activos (A) o desactivados (I). Si ya está eliminado o no existe responde "Registro no existe".
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: dni
+          in: query
+          required: false
+          schema:
+            type: string
+          example: 11111111-1
+        - name: email
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Customer eliminado
+          content:
+            application/json:
+              example:
+                success: true
+                message: Customer eliminado con éxito
+                data:
+                  dni: 11111111-1
+                  email: juan@example.com
+                  status: T
+        '404':
+          description: Ya estaba eliminado o no existe
+          content:
+            application/json:
+              example:
+                success: false
+                message: Registro no existe
+                data: null
+        '401':
+          $ref: '#/components/responses/NoAutorizado'
+        '422':
+          $ref: '#/components/responses/FaltaIdentificador'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Token obtenido en /api/login. También se acepta en el header X-Api-Token.
+
+  responses:
+    NoAutorizado:
+      description: Token no enviado, inválido o vencido
+      content:
+        application/json:
+          example:
+            success: false
+            message: Token vencido
+            data: null
+
+    FaltaIdentificador:
+      description: No se envió dni ni email
+      content:
+        application/json:
+          example:
+            success: false
+            message: Parámetros de búsqueda inválidos
+            data:
+              dni: ['Debe indicar el dni o el email del customer.']

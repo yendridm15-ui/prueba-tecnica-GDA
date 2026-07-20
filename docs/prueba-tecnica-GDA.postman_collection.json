@@ -1,0 +1,158 @@
+{
+    "info": {
+        "name": "API Customers - Prueba Técnica GDALab",
+        "description": "Colección con los 4 servicios de la prueba. Corre primero el Login: el token se guarda solo en la variable {{token}} y el resto de los requests lo usan automáticamente.\n\nAjusta la variable base_url si la API no corre en http://localhost:8000.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:8000"
+        },
+        {
+            "key": "token",
+            "value": ""
+        }
+    ],
+    "item": [
+        {
+            "name": "1. Login",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            "const json = pm.response.json();",
+                            "",
+                            "if (json.success) {",
+                            "    pm.collectionVariables.set('token', json.data.token);",
+                            "    console.log('Token guardado, vence: ' + json.data.expires_at);",
+                            "}"
+                        ]
+                    }
+                }
+            ],
+            "request": {
+                "auth": {
+                    "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Accept",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"password\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/login",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "login"]
+                },
+                "description": "Inicia sesión y devuelve el token con su vencimiento. El usuario test@example.com / password lo crean los seeders."
+            }
+        },
+        {
+            "name": "2. Registrar customer",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Accept",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"dni\": \"11111111-1\",\n    \"id_reg\": 1,\n    \"id_com\": 1,\n    \"email\": \"juan@example.com\",\n    \"name\": \"Juan\",\n    \"last_name\": \"Perez\",\n    \"address\": \"Calle Falsa 123\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/customers",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "customers"]
+                },
+                "description": "Registra un customer activo. La comuna (id_com) debe existir, estar activa y pertenecer a la región (id_reg). El campo address es opcional."
+            }
+        },
+        {
+            "name": "3. Consultar customer",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Accept",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "{{base_url}}/api/customers?dni=11111111-1",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "customers"],
+                    "query": [
+                        {
+                            "key": "dni",
+                            "value": "11111111-1"
+                        },
+                        {
+                            "key": "email",
+                            "value": "juan@example.com",
+                            "disabled": true
+                        }
+                    ]
+                },
+                "description": "Busca por dni o email (activa el parámetro que quieras usar). Solo devuelve customers activos (A) con su región y comuna."
+            }
+        },
+        {
+            "name": "4. Eliminar customer",
+            "request": {
+                "method": "DELETE",
+                "header": [
+                    {
+                        "key": "Accept",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "{{base_url}}/api/customers?dni=11111111-1",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "customers"],
+                    "query": [
+                        {
+                            "key": "dni",
+                            "value": "11111111-1"
+                        },
+                        {
+                            "key": "email",
+                            "value": "juan@example.com",
+                            "disabled": true
+                        }
+                    ]
+                },
+                "description": "Borrado lógico: el customer pasa a status T. Solo aplica si está en A o I; si ya está eliminado o no existe responde \"Registro no existe\"."
+            }
+        }
+    ]
+}
